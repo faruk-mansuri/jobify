@@ -1,7 +1,6 @@
 import styled from 'styled-components';
 import { BsFillSunFill, BsFillMoonFill } from 'react-icons/bs';
-import { useDashboardContext } from '../pages/DashboardLayout';
-import { useState } from 'react';
+import { useDashboardContext } from '../Pages/DashboardLayout';
 
 const ThemeToggle = () => {
   const { isDarkTheme, toggleDarkTheme } = useDashboardContext();
