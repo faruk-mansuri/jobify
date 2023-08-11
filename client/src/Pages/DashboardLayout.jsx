@@ -1,26 +1,41 @@
 import styled from 'styled-components';
-import { Outlet, redirect, useLoaderData, useNavigate } from 'react-router-dom';
-import { BigSidebar, SmallSidebar, Navbar } from '../Components';
-import { createContext, useContext, useState } from 'react';
+import { Outlet, redirect, useNavigate, useNavigation } from 'react-router-dom';
+import { BigSidebar, SmallSidebar, Navbar, Loading } from '../Components';
+import { createContext, useContext, useEffect, useState } from 'react';
 import customFetch from '../utils/customFetch';
 import { toast } from 'react-toastify';
+import { useQuery } from '@tanstack/react-query';
+
+const userQuery = {
+  queryKey: ['user'],
+  queryFn: async () => {
+    const { data } = await customFetch('/users/current-user');
+    return data;
+  },
+};
+
+export const loader = (queryClient) => {
+  return async () => {
+    try {
+      await queryClient.ensureQueryData(userQuery);
+      return null;
+    } catch (error) {
+      return redirect('/');
+    }
+  };
+};
 
 const DashboardContext = createContext();
 
-export const loader = async () => {
-  try {
-    const { data } = await customFetch('/users/current-user');
-    return data;
-  } catch (error) {
-    return redirect('/');
-  }
-};
-
-const DashboardLayout = ({ isDarkThemeEnabled }) => {
-  const { user } = useLoaderData();
+const DashboardLayout = ({ isDarkThemeEnabled, queryClient }) => {
+  const { user } = useQuery(userQuery).data;
   const [showSidebar, setShowSidebar] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(isDarkThemeEnabled);
   const navigate = useNavigate();
+  const navigation = useNavigation();
+  const [isAuthError, setIsAuthError] = useState(false);
+
+  const isPageLoading = navigation.state === 'loading';
 
   const toggleDarkTheme = () => {
     const newDarkTheme = !isDarkTheme;
@@ -33,12 +48,29 @@ const DashboardLayout = ({ isDarkThemeEnabled }) => {
   };
 
   const logoutUser = async () => {
+    navigate('/');
     await customFetch.get('/auth/logout');
-    setTimeout(() => {
-      navigate('/');
-    }, 3000);
+    queryClient.invalidateQueries();
+    // invalidateQuery means fetching the data again from the source and updating the cache with the new data
     toast.success('logging out');
   };
+
+  customFetch.interceptors.response.use(
+    (response) => {
+      return response;
+    },
+    (error) => {
+      if (error?.response?.status === 401) {
+        setIsAuthError(true);
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  useEffect(() => {
+    if (!isAuthError) return;
+    logoutUser();
+  }, [isAuthError]);
 
   return (
     <DashboardContext.Provider
@@ -58,7 +90,7 @@ const DashboardLayout = ({ isDarkThemeEnabled }) => {
           <div>
             <Navbar />
             <div className='dashboard-page'>
-              <Outlet context={{ user }} />
+              {isPageLoading ? <Loading /> : <Outlet context={{ user }} />}
             </div>
           </div>
         </main>

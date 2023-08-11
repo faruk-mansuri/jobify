@@ -5,36 +5,55 @@ import { Form, redirect } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import customFetch from '../utils/customFetch';
 import { FormRow, FormRowSelect, SubmitBtn } from '../Components';
+import { useQuery } from '@tanstack/react-query';
 
-export const loader = async ({ params }) => {
-  const { id } = params;
-  try {
-    const { data } = await customFetch.get(`/jobs/${id}`);
-    const { job } = data;
-    return job;
-  } catch (error) {
-    toast.error(error?.response?.data?.msg);
-    return redirect('../all-jobs');
-  }
+const singleJobQuery = (id) => {
+  return {
+    queryKey: ['job', id],
+    queryFn: async () => {
+      const { data } = await customFetch.get(`/jobs/${id}`);
+      return data;
+    },
+  };
 };
 
-export const action = async ({ request, params }) => {
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData);
+export const loader = (queryClient) => {
+  return async ({ params }) => {
+    try {
+      const { id } = params;
+      await queryClient.ensureQueryData(singleJobQuery(id));
+      return id;
+    } catch (error) {
+      toast.error(error?.response?.data?.msg);
+      return redirect('/dashboard/all-jobs');
+    }
+  };
+};
 
-  try {
-    await customFetch.patch(`/jobs/${params.id}`, data);
-    toast.success('job edited successfully');
-    return redirect('../all-jobs');
-  } catch (error) {
-    toast.error(error?.response?.data?.msg);
-    return error;
-  }
+export const action = (queryClient) => {
+  return async ({ request, params }) => {
+    const formData = await request.formData();
+    const data = Object.fromEntries(formData);
+
+    try {
+      await customFetch.patch(`/jobs/${params.id}`, data);
+      queryClient.invalidateQueries(['jobs']);
+
+      toast.success('job edited successfully');
+      return redirect('../all-jobs');
+    } catch (error) {
+      toast.error(error?.response?.data?.msg);
+      return error;
+    }
+  };
 };
 
 const EditJob = () => {
   // const params = useParams(); // how to get id from url
-  const job = useLoaderData();
+  const id = useLoaderData();
+  const {
+    data: { job },
+  } = useQuery(singleJobQuery(id));
 
   return (
     <Wrapper>
