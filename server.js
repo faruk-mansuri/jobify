@@ -59,7 +59,7 @@ const port = process.env.PORT || 5000;
 try {
   await mongoose.connect(process.env.MONGO_URL);
   app.listen(port, console.log(`server is listening on port ${port}... `));
-} catch (error) {
-  console.log(error);
+} catch (err) {
+  console.log(err);
   process.exit(1);
 }
